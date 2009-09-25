@@ -74,24 +74,16 @@ void debug_eeprom_dump(char * eepromImage, deviceConfig_t devConfig) {
 }
 
 void debug_config_dump(char * fuseImage, deviceConfig_t devConfig) {
-	int ii;
+   int i;
 
-	printf("\nConfig Dump\n");
-	for (ii = 0; ii < devConfig.fuseCount * 2 + 8; ii++) {
-		printf("%02hhX",fuseImage[ii]);
+	puts( "\nConfig Dump");
 
-		if (ii < 8) {
-			if (ii < 7) {
-				printf(" ");
-			} else {
-				printf("\n");
-			}
-		} else {
-			if (((ii - 8) & 0xF) == 0xF || ii == devConfig.fuseCount*2 + 7) {
-				printf("\n");
-			} else if (((ii - 8) & 0x1) == 0x1) {
-				printf(" ");
-			}
-		}
-	}
+   printf("ID: 0x" );
+   for( i = 0; i < 8; i++ )
+      printf("%02hhx", fuseImage[ i ]);
+
+   printf( "\nFuses:" );
+   for( i = 0; i < devConfig.fuseCount; i++ )
+      printf( " 0x%02hhx%02hhx", fuseImage[ (i << 1) + 9 ], fuseImage[ (i << 1) + 8 ] );
+   printf( "\n" );
 }

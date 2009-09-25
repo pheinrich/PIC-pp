@@ -21,11 +21,18 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 # include <config.h>
 #endif
 #include <stdio.h>
+#include "debug.h"
 #include "ihx32.h"
+
+char ascii2hexNybble( char ch )
+{
+   return( '9' < ch ? ('a' > ch ? ch - 'A' : ch - 'a') + 10 : ch - '0' );
+}
 
 int ihx32_read(FILE * hexFile, unsigned char * romImage, unsigned char *eepromImage, unsigned char *fuseImage, deviceConfig_t config ) {
 	int lba = 0;
 	char lineBuffer[256];
+	const char* cp;
 	char partBuffer[5];
 	char *destImage;
 	int numBytes;
@@ -34,72 +41,52 @@ int ihx32_read(FILE * hexFile, unsigned char * romImage, unsigned char *eepromIm
 	int value;
 	int ii;
 	int done = 0;
-	// These are in words, convert to bytes
-	int eepromStart = config.eepromStart*2;
-	int configStart = config.configStart*2;
+
+	DEBUG_p("Preparing to read from hex file\n");
 
 	while (done == 0) {
 		fgets(lineBuffer,255,hexFile);
+      cp = lineBuffer;
 
 		// First character is always ':'
-		if (lineBuffer[0] != ':') {
-			return -1;
-		}
+      if( ':' != *cp++ )
+	continue;  // skip comment lines (anything not starting with ':')
 
 		// Next come the number of bytes
-		partBuffer[0] = lineBuffer[1];
-		partBuffer[1] = lineBuffer[2];
-		partBuffer[2] = '\0';
-		numBytes = strtol(partBuffer,NULL,16);
+      numBytes = (ascii2hexNybble( *cp++ ) << 4) + ascii2hexNybble( *cp++ );
 
 		// Then the lower 16-bits of the address
-		partBuffer[0] = lineBuffer[3];
-		partBuffer[1] = lineBuffer[4];
-		partBuffer[2] = lineBuffer[5];
-		partBuffer[3] = lineBuffer[6];
-		partBuffer[4] = '\0';
-		address = strtol(partBuffer,NULL,16);
+      for( ii = 0, address = 0; ii < 4; ii++ )
+      {
+         address <<= 4;
+         address += ascii2hexNybble( *cp++ );
+      }
 
 		// And then the record type
-		partBuffer[0] = lineBuffer[7];
-		partBuffer[1] = lineBuffer[8];
-		partBuffer[2] = '\0';
-		recType = strtol(partBuffer,NULL,16);
+      recType = (ascii2hexNybble( *cp++ ) << 4) + ascii2hexNybble( *cp++ );
 
 		switch(recType) {
 			case 0: // Data Record
 				address += lba;
-				if (address >= eepromStart) {
-					if (config.eepromSize > 0) {
-						destImage = eepromImage+(address-eepromStart);
-					} else {
-						destImage = NULL;
-					}
-				} else if (address >= configStart) {
-					destImage = fuseImage+8+(address-configStart);
-				} else {
-					destImage = romImage+address;
-				}
+            if( address >= config.configStart )
+            {
+               if( address >= config.eepromStart )
+                  destImage = eepromImage + address - config.eepromStart;
+               else
+                  destImage = fuseImage + 8 + address - config.configStart;
 
-				if (destImage != NULL) {
-					// Loop over each pair of bytes and
-					// put them in the destImage
-					for (ii = 0; ii < numBytes*2; ii+= 4) {
-						// Bytes are ordered low-byte, high-byte
-						// in the file, correct this
-						partBuffer[0] = lineBuffer[9+ii];
-						partBuffer[1] = lineBuffer[9+ii+1];
-						partBuffer[2] = '\0';
-						value = strtol(partBuffer,NULL,16);
-						destImage[ii/2+1] = value;
-
-						partBuffer[0] = lineBuffer[9+ii+2];
-						partBuffer[1] = lineBuffer[9+ii+3];
-						partBuffer[2] = '\0';
-						value = strtol(partBuffer,NULL,16);
-						destImage[ii/2] = value;
-					}
-				}
+               for( ii = 0; ii < numBytes; ii++ )
+                  *destImage++ = (ascii2hexNybble( *cp++ ) << 4) + ascii2hexNybble( *cp++ );
+            }
+            else
+            {
+               destImage = romImage + address;
+               for( ii = 0; ii < numBytes; ii += 2, destImage += 2 )
+               {
+                  destImage[1] = (ascii2hexNybble( *cp++ ) << 4) + ascii2hexNybble( *cp++ );
+                  destImage[0] = (ascii2hexNybble( *cp++ ) << 4) + ascii2hexNybble( *cp++ );
+               }
+            }
 				break;
 			case 1: // End of File record
 				done = 1;
@@ -107,16 +94,14 @@ int ihx32_read(FILE * hexFile, unsigned char * romImage, unsigned char *eepromIm
 			case 2: // TODO : segment address
 				break;
 			case 4: // Upper 16-bits of address
-				partBuffer[1] = lineBuffer[9];
-				partBuffer[2] = lineBuffer[10];
-				partBuffer[3] = lineBuffer[11];
-				partBuffer[4] = lineBuffer[12];
-				partBuffer[5] = '\0';
-				lba = strtol(partBuffer, NULL, 16);
-				lba <<= 16;
+            for( ii = 0, lba = 0; ii < 4; ii++ )
+            {
+               lba <<= 4;
+               lba += ascii2hexNybble( *cp++ );
+            }
+            lba <<= 16;
 				break;
 		}
-		
 	}
 
 	return 0;

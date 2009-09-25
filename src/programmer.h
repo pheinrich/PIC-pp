@@ -24,6 +24,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 int programmer_reset(int port);
 int programmer_program_mode(int port);
+int programmer_echo(int port, char ch);
 int programmer_proto_check(int port);
 int programmer_chip_in_socket(int port);
 int programmer_init(int port, deviceConfig_t devConfig);
@@ -41,4 +42,5 @@ int programmer_erase_eeprom_check(int port);
 int programmer_write_rom(int port, char *romImage, deviceConfig_t devConfig);
 int programmer_write_eeprom(int port, char *eepromImage, deviceConfig_t devConfig);
 int programmer_write_fuses(int port, char * fuseImage, deviceConfig_t devConfig);
+int programmer_write_18Fxxxxx(int port, char * fuseImage, deviceConfig_t devConfig);
 #endif

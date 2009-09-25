@@ -55,7 +55,7 @@ int config_parse(char * configFile, char * chipName, deviceConfig_t * devConfig)
 		}
 
 		// Parse the key and value
-		sscanf(buffer,"%[0-9a-zA-Z]=%s",key,value);
+		sscanf(buffer,"%[0-9a-zA-Z]=%[^\t\n]",key,value);
 
 		// Look for the CHIPname
 		// If we find the right CHIPname value, read everything else

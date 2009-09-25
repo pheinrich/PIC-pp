@@ -64,15 +64,30 @@ int programmer_program_mode(int port) {
 	return 0;
 }
 
+int programmer_echo(int port, char ch) {
+	unsigned char command;
+
+   command = 2;
+   write(port,&command,1);
+   write(port,&ch,1);
+   read(port,&command,1);
+   if( command != ch ) {
+      printf("DEBUG: Bad echo: %c != %c\n", command, ch);
+      return -1;
+   }
+   
+   return 0;
+}
+
 int programmer_proto_check(int port) {
 	unsigned char command;
-	unsigned char receive[4] = "XYZA";
+	unsigned char receive[5] = "XYZA\0";
 
 	command = 21;
 	write(port,&command,1);
 	read(port,receive,4);
 	if (strncasecmp(receive,PROTO_VERSION,4) != 0) {
-		printf("Version: %4c\n",receive);
+	  printf("Version: %4s\n", receive);
 		return -2;
 	}
 
@@ -239,15 +254,19 @@ int programmer_read_rom(int port, unsigned char * romImage, deviceConfig_t devCo
 	unsigned char command;
 	int size;
 	int len;
-
+   
 	command = 11;
-	write(port,&command,1);
+	write(port,&command,1); 
 
 	len = 0;
 	size = devConfig.romSize * 2;
-	while ((len += read(port,romImage+len,256)) != size) {
-		DEBUG_p("DEBUG: rom read %d of %d bytes\n",len,size);
+   printf("0x%05x: ", len);
+	while ((len += read(port,romImage+len,1)) != size) {
+      printf(" %02hhx", romImage[len-1]);
+      if( 0 == (len % 16))
+         printf("\n0x%05x: ",len);
 	}
+   puts("");
 
 	return 0;
 }
@@ -262,8 +281,11 @@ int programmer_read_eeprom(int port, unsigned char * eepromImage, deviceConfig_t
 
 	len = 0;
 	size = devConfig.eepromSize;
-	while ((len += read(port,eepromImage+len,256)) != size) {
-		DEBUG_p("DEBUG: eeprom read %d of %d bytes\n",len,size);
+   printf("\n0x%05x: ",len+devConfig.eepromStart);
+	while ((len += read(port,eepromImage+len,1)) != size) {
+      printf(" %02hhx", eepromImage[len-1]);
+      if( 0 == (len % 16))
+         printf("\n0x%05x: ",len+devConfig.eepromStart);
 	}
 
 	return 0;
@@ -291,15 +313,8 @@ int programmer_read_config(int port, char * fuseImage, deviceConfig_t devConfig)
 	}
 
 	// IDs first
-	for (ii = 0; ii < 8; ii++) {
-		fuseImage[ii] = buffer[ii+2];
-	}
-
 	// Followed by Fuses in MSB
-	for (ii = 0; ii < devConfig.fuseCount*2; ii += 2) {
-		fuseImage[8+ii] = buffer[10+ii+1];
-		fuseImage[8+ii+1] = buffer[10+ii];
-	}
+   memcpy(fuseImage, buffer + 2, 22);
 
 	return 0;
 }
@@ -372,88 +387,70 @@ int programmer_erase_eeprom_check(int port) {
 
 }
 
-int programmer_write_rom(int port, char *romImage, deviceConfig_t devConfig) {
-	unsigned char command;
-	unsigned char buffer[32];
-	int ii, offset, endOffset, keepGoing = 1;
+int programmer_write_rom(int port, char *romImage, deviceConfig_t devConfig)
+{
+   unsigned short* sp = (unsigned short*)romImage;
+   unsigned short* ep = sp + devConfig.romSize;
+   unsigned short pad = (unsigned short)devConfig.romPad;
 
-	for (ii = devConfig.romSize*2 - 2; ii >= 0; ii -= 2) {
-		if (romImage[ii] != (devConfig.romPad >> 8) && romImage[ii+1] != (devConfig.romPad & 0xFF)) {
-			endOffset = ii;
-			break;
-		}
+   while( ep > sp && pad == *--ep )
+      /* loop to first non-pad word */;
+
+   int in, totalWords = ++ep - sp;
+   unsigned char buffer[ 5 ];
+
+   *buffer = 7;
+   write( port, buffer, 1 );
+
+   buffer[ 0 ] = totalWords >> 8;
+   buffer[ 1 ] = totalWords & 0xff;
+   write( port, buffer, 2 );
+
+   read( port, buffer, 1);
+   if( 'Y' != *buffer )
+   {
+      DEBUG_p( "DEBUG: write rom: bad response: %c\n", *buffer );
+      return -1;
+   }
+
+   while( 1 )
+   {
+      unsigned short address = sp - (unsigned short*)romImage;
+
+      write( port, sp, 32 );
+      /*
+      {
+	int a;
+	printf("0x%04x:", (unsigned int)(((char*)sp) - romImage));
+	for(a=0; a<32; a++) {
+	  printf(" %02x", ((unsigned char*)sp)[a]);
 	}
-	endOffset += 2;
-	endOffset /= 2;
-	DEBUG_p("DEBUG: Going to write from 0x0000 - 0x%04X\n",endOffset);
+	puts("");
+      }
+      */
+      printf( "Writing ROM: %d%%\r", 50 * ((char*)sp - romImage) / totalWords );
+      fflush(stdout);
+      sp += (32 / sizeof( *sp ));
 
-	command = 7;
-	write(port,&command,1);
+      in = read( port, buffer, 5 );
+      switch( *buffer )
+      {
+         case 'N':
+	    printf( "\nFailed to write ROM (current address 0x%0x)\n", (unsigned int)(((char*)sp) - romImage) );
+            return -3;
 
-	// Send romSize
-	buffer[0] = endOffset >> 8;
-	buffer[1] = endOffset & 0xFF;
-	write(port,buffer,2);
+         case 'P':
+	    puts("Writing ROM: complete");
+	    return 0;
 
-	read(port,buffer,1);
-	if (buffer[0] != 'Y') {
-		DEBUG_p("DEBUG: write rom: bad response: %c\n",buffer[0]);
-		return -1;
-	}
+         case 'Y':
+            break;
 
-	// Fill Buffer A
-	for (ii = 0; ii < 32; ii++) {
-		buffer[ii] = romImage[ii];
-	}
-	offset = ii;
-	write(port,buffer,32);
-
-	read(port,buffer,1);
-	if (buffer[0] != 'Y') {
-		DEBUG_p("DEBUG: write rom: buffer_A bad response: %c\n",buffer[0]);
-		return -2;
-	}
-
-	// Fill Buffer B
-	for (ii = 0; ii < 32; ii++) {
-		buffer[ii] = romImage[offset+ii];
-	}
-	offset += ii;
-	write(port,buffer,32);
-
-	while (1) {
-		// Blank buffer
-		buffer[0] = '\0';
-		buffer[1] = '\0';
-		buffer[2] = '\0';
-
-		// Read completion codes
-		read(port,buffer,1);
-
-		// Possible results are
-		// 'N' = Programming error followed by current addres MSB first
-		// 'YP' = Programming finished
-		// 'Y' = Read for next 32 bytes
-		if (buffer[0] == 'N') {
-			read(port,buffer,2);
-			DEBUG_p("DEBUG: write rom: error writing %x\n",(unsigned int)(buffer[0] << 8) | buffer[1]);
-			return -3;
-		} else if (buffer[0] == 'Y') {
-			if (read(port,buffer,1) == 1 && buffer[0] == 'P') {
-				// All done
-				break;
-			}
-		}
-
-		// Write the next 32 bytes
-		for (ii = 0; ii < 32; ii++) {
-			buffer[ii] = romImage[offset+ii];
-		}
-		offset += ii;
-		write(port, buffer, 32);
-	}
-
-	return 0;
+         default:
+	    printf( "\nBad write response, '%c' (current address 0x%0x)\n", *buffer, (unsigned int)(((char*)sp) - romImage) );
+            break;
+      }
+   }
 }
 
 int programmer_write_eeprom(int port, char *eepromImage, deviceConfig_t devConfig) {
@@ -463,9 +460,8 @@ int programmer_write_eeprom(int port, char *eepromImage, deviceConfig_t devConfi
 
 	command = 8;
 	write(port,&command,1);
-
 	// Send eepromSize
-	size = devConfig.eepromSize + 2;
+	size = devConfig.eepromSize;
 	buffer[0] = size >> 8;
 	buffer[1] = size & 0xFF;
 	write(port,buffer,2);
@@ -481,7 +477,10 @@ int programmer_write_eeprom(int port, char *eepromImage, deviceConfig_t devConfi
 	while (1) {
 		buffer[0] = eepromImage[offset];
 		buffer[1] = eepromImage[offset+1];
+
 		write(port,buffer,2);
+		printf( "Writing EEPROM: %d%%\r", 100 * offset / size );
+		fflush(stdout);
 
 		// Read completion codes
 		read(port,buffer,1);
@@ -496,7 +495,7 @@ int programmer_write_eeprom(int port, char *eepromImage, deviceConfig_t devConfi
 
 		offset += 2;
 	}
-
+	puts( "Writing EEPROM: complete" );
 	return 0;
 }
 
@@ -507,66 +506,54 @@ int programmer_write_fuses(int port, char * fuseImage, deviceConfig_t devConfig)
 	command = 9;
 	write(port,&command,1);
 
+	printf("Writing fuses... ");
+	fflush(stdout);
+
 	buffer[0] = '0';
 	buffer[1] = '0';
 
 	if (devConfig.bits == 14) {
-		buffer[2] = fuseImage[0];
-		buffer[3] = fuseImage[1];
-		buffer[4] = fuseImage[2];
-		buffer[5] = fuseImage[3];
-		buffer[6] = 'F';
-		buffer[7] = 'F';
-		buffer[8] = 'F';
-		buffer[9] = 'F';
-		buffer[10] = fuseImage[9];
-		buffer[11] = fuseImage[8];
-		buffer[12] = 0xFF;
-		buffer[13] = 0xFF;
-		buffer[14] = 0xFF;
-		buffer[15] = 0xFF;
-		buffer[16] = 0xFF;
-		buffer[17] = 0xFF;
-		buffer[18] = 0xFF;
-		buffer[19] = 0xFF;
-		buffer[20] = 0xFF;
-		buffer[21] = 0xFF;
-		buffer[22] = 0xFF;
-		buffer[23] = 0xFF;
+      memcpy(buffer + 2, fuseImage, 4);
+      memset(buffer + 6, 'F', 4);
+      memcpy(buffer + 10, fuseImage + 8, 2);
+      memset(buffer + 12, 0xff, 12);
 	} else if (devConfig.bits == 16) {
-		buffer[2] = fuseImage[0];
-		buffer[3] = fuseImage[1];
-		buffer[4] = fuseImage[2];
-		buffer[5] = fuseImage[3];
-		buffer[6] = fuseImage[4];
-		buffer[7] = fuseImage[5];
-		buffer[8] = fuseImage[6];
-		buffer[9] = fuseImage[7];
-		buffer[10] = fuseImage[9];
-		buffer[11] = fuseImage[8];
-		buffer[12] = fuseImage[11];
-		buffer[13] = fuseImage[10];
-		buffer[14] = fuseImage[13];
-		buffer[15] = fuseImage[12];
-		buffer[16] = fuseImage[15];
-		buffer[17] = fuseImage[14];
-		buffer[18] = fuseImage[17];
-		buffer[19] = fuseImage[16];
-		buffer[20] = fuseImage[19];
-		buffer[21] = fuseImage[18];
-		buffer[22] = fuseImage[21];
-		buffer[23] = fuseImage[20];
+      memcpy(buffer + 2, fuseImage, 22);
 	} else {
 		return -1;
 	}
 
 	write(port,buffer,24);
-
+	puts( "complete");
 	read(port,buffer,1);
 	if (buffer[0] != 'Y') {
 		DEBUG_p("DEBUG: write config: bad response %c\n",buffer[0]);
 		return -2;
 	}
 
+	return 0;	
+}
+
+int programmer_write_18Fxxxxx(int port, char* fuseImage, deviceConfig_t devConfig)
+{
+   unsigned char command;
+   unsigned char buffer[24];
+
+   command = 17;
+   write(port,&command,1);
+   printf( "Writing 18Fxxxx fuses... " );   
+   fflush(stdout);
+
+   memset(buffer,0,2);
+   memcpy(buffer + 2, fuseImage, 22);
+
+   write(port,buffer,24);
+   puts("complete");
+	read(port,buffer,1);
+	if (buffer[0] != 'Y') {
+		DEBUG_p("DEBUG: write 18Fxxxxx: bad response %c\n",buffer[0]);
+		return -2;
+	}
+   
 	return 0;	
 }

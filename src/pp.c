@@ -21,6 +21,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 # include <config.h>
 #endif
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sysexits.h>
 #include <termios.h>
@@ -159,8 +160,8 @@ int main(int argc, char * const argv[]) {
 	//       (1 word = 2 bytes)
 	romImage = (unsigned char *)malloc(sizeof(unsigned char) * devConfig.romSize * 2);
 	for (ii = devConfig.romSize*2 - 2; ii >= 0; ii -= 2) {
-		romImage[ii] = 0x3F;
-		romImage[ii+1] = 0xFF;
+		romImage[ii] = devConfig.romPad >> 8;
+		romImage[ii+1] = devConfig.romPad & 0xFF;
 	}
 
 	if (devConfig.eepromSize > 0) {
@@ -180,21 +181,23 @@ int main(int argc, char * const argv[]) {
 	fuseImage[8] = devConfig.fuse1Blank >> 8;
 	fuseImage[9] = devConfig.fuse1Blank & 0xFF;
 	if (devConfig.fuseCount == 2 || devConfig.fuseCount == 7) {
-		fuseImage[10] = devConfig.fuse2Blank >> 8;
-		fuseImage[11] = devConfig.fuse2Blank & 0xFF;
+		fuseImage[10] = devConfig.fuse2Blank & 0xFF;
+		fuseImage[11] = devConfig.fuse2Blank >> 8;
 	}
 	if (devConfig.fuseCount == 7) {
-		fuseImage[12] = devConfig.fuse3Blank >> 8;
-		fuseImage[13] = devConfig.fuse3Blank & 0xFF;
-		fuseImage[14] = devConfig.fuse4Blank >> 8;
-		fuseImage[15] = devConfig.fuse4Blank & 0xFF;
-		fuseImage[16] = devConfig.fuse5Blank >> 8;
-		fuseImage[17] = devConfig.fuse5Blank & 0xFF;
-		fuseImage[18] = devConfig.fuse6Blank >> 8;
-		fuseImage[19] = devConfig.fuse6Blank & 0xFF;
-		fuseImage[20] = devConfig.fuse7Blank >> 8;
-		fuseImage[21] = devConfig.fuse7Blank & 0xFF;
+		fuseImage[12] = devConfig.fuse3Blank & 0xFF;
+		fuseImage[13] = devConfig.fuse3Blank >> 8;
+		fuseImage[14] = devConfig.fuse4Blank & 0xFF;
+		fuseImage[15] = devConfig.fuse4Blank >> 8;
+		fuseImage[16] = devConfig.fuse5Blank & 0xFF;
+		fuseImage[17] = devConfig.fuse5Blank >> 8;
+		fuseImage[18] = devConfig.fuse6Blank & 0xFF;
+		fuseImage[19] = devConfig.fuse6Blank >> 8;
+		fuseImage[20] = devConfig.fuse7Blank & 0xFF;
+		fuseImage[21] = devConfig.fuse7Blank >> 8;
 	}
+
+	DEBUG_p("DEBUG: Attempting to open serial port %s\n",serialPort);
 
 	// Open the serial port
 	if ((serialFd = serial_open(serialPort,19200,8,PARITY_NONE,1)) < 0) {
@@ -304,11 +307,11 @@ int main(int argc, char * const argv[]) {
 		programmer_read_config(serialFd, fuseImage, devConfig);
 		programmer_voltages_off(serialFd);
 
-#if defined(DEBUG)
+		//#if defined(DEBUG)
 		debug_rom_dump(romImage, devConfig);
 		debug_eeprom_dump(eepromImage, devConfig);
 		debug_config_dump(fuseImage, devConfig);
-#endif
+		//#endif
 
 		ihx32_write(hexFd,romImage,eepromImage,fuseImage,devConfig);
 
@@ -331,7 +334,6 @@ int main(int argc, char * const argv[]) {
 			// Check for a blank ROM
 			programmer_voltages_on(serialFd);
 			ret = programmer_erase_rom_check(serialFd, devConfig);
-			programmer_voltages_off(serialFd);
 
 			if (ret < 0) {
 				printf("Error: failed to check for erased ROM\n");
@@ -341,10 +343,14 @@ int main(int argc, char * const argv[]) {
 				return EX_SOFTWARE;
 			}
 
+         ret = programmer_echo(serialFd, 'V');
+         if( 0 > ret ) {
+            printf("Error: failed echo\n");
+            return EX_SOFTWARE;
+         }
+   
 			// Check for a blank EEPROM
-			programmer_voltages_on(serialFd);
 			ret = programmer_erase_eeprom_check(serialFd);
-			programmer_voltages_off(serialFd);
 
 			if (ret < 0) {
 				printf("Error: failed to check for erased EEPROM\n");
@@ -353,6 +359,18 @@ int main(int argc, char * const argv[]) {
 				printf("Error: EEPROM is not erased, write will not be performed.  Override with -f.\n");
 				return EX_SOFTWARE;
 			}
+
+         ret = programmer_echo(serialFd, 'v');
+         if( 0 > ret ) {
+            printf("Error: failed echo\n");
+            return EX_SOFTWARE;
+         }
+         ret = programmer_echo(serialFd, 'V');
+         if( 0 > ret ) {
+            printf("Error: failed echo\n");
+            return EX_SOFTWARE;
+         }
+         programmer_voltages_off(serialFd);
 		}
 
 
@@ -380,26 +398,47 @@ int main(int argc, char * const argv[]) {
 
 		programmer_voltages_on(serialFd);
 		ret = programmer_write_rom(serialFd,romImage,devConfig);
-		programmer_voltages_off(serialFd);
 		if (ret < 0) {
 			printf("Error: failed to write ROM\n");
 			return EX_SOFTWARE;
 		}
 
+      ret = programmer_echo(serialFd, 'V');
+      if( 0 > ret ) {
+         printf("Error: failed echo\n");
+         return EX_SOFTWARE;
+      }
+
 		if (devConfig.eepromSize > 0) {
-			programmer_voltages_on(serialFd);
 			ret = programmer_write_eeprom(serialFd,eepromImage,devConfig);
-			programmer_voltages_off(serialFd);
 			if (ret < 0) {
 				printf("Error: failed to write EEPROM\n");
 			}
 		}
 
-		programmer_voltages_on(serialFd);
+      ret = programmer_echo(serialFd, 'V');
+      if( 0 > ret ) {
+         printf("Error: failed echo\n");
+         return EX_SOFTWARE;
+      }
+
 		ret = programmer_write_fuses(serialFd,fuseImage,devConfig);
+		if (ret < 0) {
+			printf("Error: failed to write config\n");
+         return EX_SOFTWARE;
+		}
+      
+      ret = programmer_echo(serialFd, 'V');
+      if( 0 > ret ) {
+         printf("Error: failed echo\n");
+         return EX_SOFTWARE;
+      }
+      
+      ret = programmer_write_18Fxxxxx(serialFd,fuseImage,devConfig);
 		programmer_voltages_off(serialFd);
 		if (ret < 0) {
 			printf("Error: failed to write FUSEs\n");
+         return EX_SOFTWARE;
 		}
 
 	} else if (op_verify) {

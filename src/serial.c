@@ -128,21 +128,27 @@ int serial_open(const char *port, int baudrate, int databits,
 	}
 
 	// Open the device file
-	fd = open(port, O_RDWR | O_NOCTTY);
+	fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
 	if (fd < 0)
 	{
 		// Can't open the device
 		return -4;
 	}
 
-	// Retrieve the current terminal IO settings
-	tcgetattr(fd, &oldtio);
+	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) & ~O_NONBLOCK);
 
-	oldtio.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-	oldtio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-	oldtio.c_cflag &= ~(CSIZE | PARENB);
+	// Retrieve the current terminal IO settings
+	if(-1 == tcgetattr(fd, &oldtio))
+	  {
+	    close(fd);
+	    return -4;
+	  }
+
+	oldtio.c_oflag = 0;
+	oldtio.c_lflag = 0;
+	oldtio.c_iflag &= (IXON | IXOFF | IXANY);
+	oldtio.c_cflag &= ~HUPCL;
 	oldtio.c_cflag |= termdatabits | termstopbits | termparity | CREAD | CLOCAL;
-	oldtio.c_oflag &= ~(OPOST);
 
 	// Reads complete if 2 characters are read or
 	// .5 seconds elapses
