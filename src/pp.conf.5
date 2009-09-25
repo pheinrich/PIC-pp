@@ -1,0 +1,165 @@
+.TH "pp.conf" "5" "0.1" "Rick Altherr" "PIC Programmer"
+.SH "NAME"
+.LP 
+\fBpp.conf\fR \- Configuration file for pp
+.SH "DESCRIPTION"
+.LP 
+pp.conf contains descriptions of the devices that pp can program
+.SH "PARAMETERS"
+.TP 
+\fBCHIPname\fR=\fIname\fR
+Specifies the name of the device being described.
+.TP 
+\fBEraseMode\fR=\fInumber\fR
+Specifies the method of erasure the device requires.
+.br 
+ 
+.br 
+Values:
+.br 
+0	16C8x, 16F8x, 16F87x
+.br 
+1	16F7x
+.br 
+2	12F67x
+.br 
+3	16F7x7
+.br 
+4	18Fxxxx
+.br 
+5	16F87xA, 16F818, 16F87
+.br 
+6	10Fxxx
+.br 
+7	16F5x
+.TP 
+\fBFlashChip\fR=\fIy/n\fR
+Specifies whether the device is FLASH\-based or not.
+.TP 
+\fBPowerSequence\fR=\fIsequence\fR
+Specifies the power sequence needed to program the device.
+.br 
+ 
+.br 
+Values:
+.br 
+VccVpp1		Vcc, a short delay, then Vpp1
+.br 
+VccVpp2		Vcc, a short delay, then Vpp2
+.br 
+Vpp1Vcc		Vpp1, a short delay, then Vcc
+.br 
+Vpp2Vcc		Vpp2, a short delay, then Vcc
+.br 
+VccFastVpp1	Vcc, then Vpp1
+.br 
+VccFastVpp2	Vcc, then Vpp2
+.TP 
+\fBProgramDelay\fR=\fInumber\fR
+Specifies the delay before programming a FLASH chip in 100uS.
+.TP 
+\fBProgramTries\fR=\fInumber\fR
+Specifies the number of times programming of a memory location will be attempted before reporting an error.
+.TP 
+\fBOverProgram\fR=\fInumber\fR
+Specifies how many over program pulses are used for each location.
+.TP 
+\fBCoreType\fR=\fItype\fR
+Specifies the core type the device uses.
+.br 
+ 
+.br 
+Values:
+.br 
+bit12_A		12C50x
+.br 
+bit12_B		16F5x
+.br 
+bit14_A		12C67x, 16C50x, 16Cxxx
+.br 
+bit14_B		16C8x, 16F8x, 16F87x, 16F62x
+.br 
+bit14_C		16F7x, 16F7x7
+.br 
+bit14_D		12F67x
+.br 
+bit14_E		16F87x\-A
+.br 
+bit14_F		16F818
+.br 
+bit14_G		16F87, 16F88
+.br 
+bit14_H		10Fxxx
+.br 
+bit16_A		18Fx230, 18Fx330
+.br 
+bit16_B		18Fxx2, 18Fxx8
+.br 
+bit16_C		18Fx525, 18Fx621
+.TP 
+\fBROMsize\fR=\fInumber\fR
+Specifies the size of the device's ROM in bytes.  Number is a HEX value.
+.TP 
+\fBEEPROMsize\fR=\fInumber\fR
+Specifies the size of the device's EEPROM in bytes.  Number is a HEX value.
+.TP 
+\fBFUSEblank\fR=\fIvalue1\fR [\fIvalue2 ...\fR]
+Specifies the value to be written for each FUSE during an erase or when the value is not provided.  \fIvalue1\fR is the value for FUSE1, etc.  There may be 1, 2, or 7 values.
+.TP 
+\fBCALword\fR=\fIy/n\fR
+Specifies that the device has an oscillator calibration value.
+.TP 
+\fBBandGap\fR=\fIy/n\fR
+Specifies that the device has a bandgap calibration value.
+.TP 
+\fBChipID\fR=\fInumber\fR
+Specifies the identification value of the device.  Number is a HEX value where the bits are as follows:
+.br 
+ 
+.br 
+	IIII IIII IIIR RRRR
+.br 
+ 
+.br 
+I = identification value bit
+.br 
+R = revision value bit
+.br 
+ 
+.br 
+The revision bits are ignored.
+.SH "EXAMPLE"
+.LP 
+CHIPname=10F200
+.br 
+EraseMode=6
+.br 
+FlashChip=Y
+.br 
+PowerSequence=VccVpp1
+.br 
+ProgramDelay=20
+.br 
+ProgramTries=1
+.br 
+OverProgram=1
+.br 
+CoreType=bit14_H
+.br 
+ROMsize=000100
+.br 
+EEPROMsize=00000000
+.br 
+FUSEblank=0FFF
+.br 
+CALword=Y
+.br 
+BandGap=N
+.br 
+ChipID=FFFF
+.SH "FILES"
+.LP 
+pp.conf
+.SH "SEE ALSO"
+.LP 
+pp(1)

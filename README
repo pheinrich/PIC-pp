@@ -1,0 +1,18 @@
+pp - PIC Programmer
+
+What is it?
+-----------
+
+pp is a command-line program for UNIX system to program a PIC microcontroller.
+Currently it support the kitsrus.com DIY kits 149 and 150.
+
+Notes for pp 0.1
+----------------
+* Limited testing has been performed with a Kit 150.  A Kit 149 should also
+  work, but has not been attempted.
+* This program was written mostly in the course of a single night.  It serves
+  the needs of the developer currently, but many more features will be added
+  in future releases.  Do not expect everything from this release.
+* If you encouter a problem, try rebuilding with "CFLAGS=-DDEBUG".  This
+  gives you a bunch of debug output including image dumps.  If you are
+  reporting a bug, please include this output.

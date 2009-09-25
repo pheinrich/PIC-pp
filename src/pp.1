@@ -1,0 +1,72 @@
+.TH "pp" "1" "0.1" "Rick Altherr" "Programming Tools"
+.SH "NAME"
+.LP 
+pp \- PIC Programmer
+.SH "SYNTAX"
+.LP 
+pp [\fB\-c\fR <\fIfile\fR>] \fB\-d\fR <\fIdevice\fR> [\fB\-p\fR <\fIfile\fR>] \fB\-r\fR <\fIfile\fR>
+.br 
+pp [\fB\-c\fR <\fIfile\fR>] \fB\-d\fR <\fIdevice\fR> [\fB\-p\fR <\fIfile\fR>] [\fB\-fC\fR] \fB\-w\fR <\fIfile\fR>
+.br 
+pp [\fB\-c\fR <\fIfile\fR>] \fB\-d\fR <\fIdevice\fR> [\fB\-p\fR <\fIfile\fR>] \fB\-v\fR <\fIfile\fR>
+.br 
+pp [\fB\-c\fR <\fIfile\fR>] \fB\-d\fR <\fIdevice\fR> [\fB\-p\fR <\fIfile\fR>] \fB\-e\fR
+.SH "DESCRIPTION"
+.LP 
+\fBpp\fR is a simple PIC programmer.  It currently supports the 
+kitsrus.com DIY Kit 149 and Kit 150.  It allows reading, writing, verifying, and erasing the ROM and EEPROM of the Microchip PICs specified in the configuration file.
+.SH "OPTIONS"
+.LP 
+.TP 
+\fB\-C\fR
+Write calibration word stored in the file (default: preserve calibration word stored on device)
+.TP 
+\fB\-c \fIfile\fR
+Read configuration from file (default: /usr/local/etc/pp.conf)
+.TP 
+\fB\-d \fIdevice\fR
+Specify \fIdevice\fR as the PIC to be operated on (ex: 16F777)
+.TP 
+\fB\-e\fR
+Erase the device (ROM, EEPROM, and FUSEs)
+.TP 
+\fB\-f\fR
+Force writing to the device
+.TP 
+\fB\-p \fIfile\fR
+Use \fIfile\fR as the serial port on which the programmer is attached
+.TP 
+\fB\-r \fIfile\fR
+Read from the device into \fIfile\fR
+.TP 
+\fB\-w \fIfile\fR
+Write from \fIfile\fR to the device
+.TP 
+\fB\-v \fIfile\fR
+Verify the contents of the device match those of \fIfile\fR
+.SH "FILES"
+.LP 
+\fIpp.conf\fR
+.SH "EXAMPLES"
+.LP 
+To read the contents of the device into test.hex in Intel HEX32 format:
+.LP 
+	pp \-d 12F675 \-r test.hex
+.LP 
+To write the contents of test.hex onto the device:
+.LP 
+	pp \-d 12F675 \-w test.hex
+.LP 
+To verify the contents of the device match the contents of test.hex:
+.LP 
+	pp \-d 12F675 \-v test.hex
+.LP 
+To erase the contents of the device:
+.LP 
+	pp \-d 12F675 \-e
+.SH "AUTHORS"
+.LP 
+Rick Altherr <kc8apf@kc8apf.net>
+.SH "SEE ALSO"
+.LP 
+pp.conf(5)
