@@ -1,8 +1,8 @@
-PIC pp
-Copyright (c) 2009  Peter Heinrich
-
 Original pp (PIC Programmer)
 Copyright (c) 2005  Richard Altherr
+
+PIC pp
+Changes Copyright (c) 2009  Peter Heinrich
 
 This program provides a command line interface to control KitsRUs DIY kits
 149 and 150, allowing Microchip PIC microcontrollers to be programmed from the
@@ -10,8 +10,8 @@ Unix/Linux/Mac command line.
 
 This project is fundamentally the work of Richard Altherr, whose original pp
 program was released under the GPL v2 in 2005.  This version simply patches
-bugs and updates the utility to support 18Fxxxx-series chips.  For more info-
-rmation about the changes made, please see:
+bugs and updates the utility to support 18Fxxxx-series chips.  For more in-
+formation about the changes made, please see:
 
   http://saphum.com/content/programming-pic-mac-os-x
 
